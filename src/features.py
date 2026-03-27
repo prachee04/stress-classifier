@@ -20,9 +20,23 @@ def extract_features(window):
         features["RMSSD"] = 0
 
     # ---------------- EDA ----------------
-    eda = window["EDA"]
-    features["SCL_mean"] = np.mean(eda)
-    features["EDA_std"] = np.std(eda)
+    try:
+        eda = window["EDA"]
+        
+        eda_signals, eda_info = nk.eda_process(eda, sampling_rate=700)
+        
+        # Tonic component (baseline)
+        features["SCL_mean"] = np.mean(eda_signals["EDA_Tonic"])
+        
+        # Phasic component (stress spikes)
+        features["SCR_N"] = len(eda_info["SCR_Peaks"])
+        
+        features["EDA_std"] = np.std(eda)
+        
+    except:
+        features["SCL_mean"] = 0
+        features["SCR_N"] = 0
+        features["EDA_std"] = 0
 
     # ---------------- ACC ----------------
     acc = window["ACC"]

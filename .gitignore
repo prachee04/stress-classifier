@@ -18,3 +18,4 @@ data/WESAD/
 *.tmp
 *.temp
 debug.py
+app.py

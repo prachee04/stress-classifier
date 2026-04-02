@@ -1,221 +1,243 @@
 # Multimodal Passive Sensing for Stress Detection
-### A Deployment-Aware Sensor Selection Framework Using Multi-Criteria Decision Analysis
 
-> **WESAD Dataset · 15 Subjects · 20 Signal Combinations · 4 ML Models · Custom MCDA Framework**
+### A deployment-aware sensor selection framework using MCDA
 
-(paste streamlit and dataset link here)
----
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-red.svg)](https://streamlit.io)
+[![Dataset](https://img.shields.io/badge/Dataset-WESAD-green.svg)](https://ubicomp.net/sw/data/wesad.html)
 
-##  Project Summary
-
-This project answers a deceptively simple question:
-
-> **How many sensors do you actually need to detect stress — and which ones?**
-
-Using the WESAD physiological dataset, we train and evaluate machine learning classifiers across **20 signal combinations** (single sensor → all 6 sensors), then rank them not just by accuracy but by a custom **Multi-Criteria Decision Analysis (MCDA)** framework that factors in hardware cost, wearability, battery life, and signal robustness.
-
-The result is a **deployment-aware recommendation system** — the optimal sensor set changes depending on whether you're building a consumer wristband app, a mid-budget clinic tool, or a full research lab setup.
+> **Live dashboard →** `https://stress-classifier-awaqcc2kv9e2c47jm8vlcd.streamlit.app/`  
+> **Project summary →** `[link to summary doc]`  
+> **Contact →** `mprachee2204@gmail.com`
 
 ---
 
-## 🔬 The 6 Physiological Signals
+## What makes this different
 
-| Signal | Sensor | What It Measures | Key Features |
-|--------|--------|-----------------|--------------|
-| **HRV** | ECG (chest) | Beat-to-beat interval variability | SDNN, RMSSD, LF/HF ratio |
-| **EDA** | Skin conductance (wrist/fingers) | Sweat gland activity | SCL_mean, SCR_count, SCR_amplitude |
-| **ACC** | 3-axis accelerometer (wrist) | Physical movement & restlessness | Variance, entropy, peak count |
-| **Respiration** | Chest belt | Breathing rate & depth | Resp_mean, Resp_std, breathing rate |
-| **Temperature** | Thermistor (wrist) | Skin surface temperature | Temp_mean, rate of change, min/max |
-| **EMG** | Electrodes (trapezius + zygomaticus) | Muscle electrical activity | RMS, MAV, zero-crossing rate |
+Every WESAD paper asks: *does combining sensors improve accuracy?* The answer is always yes.
+
+This study asks the harder question: **which combination is actually worth deploying — given that sensors have real hardware costs, wearability constraints, battery limits, and signal quality issues?**
+
+The answer depends entirely on who is deploying it. This framework quantifies that tradeoff.
 
 ---
 
-## 💡 Research Hypotheses
+## The core finding
 
-| # | Hypothesis | Outcome |
-|---|-----------|---------|
-| H1 | No single signal achieves optimal accuracy — 2–3 signals needed | ✅ Confirmed |
-| H2 | EDA will be the strongest unimodal signal | ✅ Confirmed |
-| H3 | ACC will outperform expectations as a behavioral stress indicator | ✅ Confirmed |
-| H4 | HRV will underperform despite being the most cited stress biomarker | ✅ Confirmed |
-| H5 | Adding signals beyond 3 yields diminishing returns / hurts performance | ✅ Confirmed (Surprise) |
-| H6 | The optimal sensor combo changes depending on deployment context | ✅ Confirmed |
-| H7 | The MCDA winner shifts at least twice across the λ sweep (0.2→1.0) | ✅ Confirmed (3 shifts) |
+The optimal sensor combination **changes** as deployment context changes:
+
+| Context | Winner | Optimised Score |
+|---------|--------|----------------|
+| Consumer app (λ=0.2) | **ACC alone** | O = 0.855 |
+| Balanced deployment (λ=0.5) | **EDA + ACC** | O = 0.674 |
+| Lab / clinical (λ=1.0) | **EDA + ACC + EMG** | O = 0.744 |
+
+And the most surprising finding: **all 6 signals together (P=0.715) performs worse than the best 3-signal combination (P=0.744)**. More sensors ≠ better performance.
 
 ---
 
-## ⚙️ Pipeline & Execution
+## Dataset
+
+**WESAD** (Wearable Stress and Affect Detection)  
+Schmidt et al., ICMI 2018
+
+- 15 subjects, chest-worn device
+- 700 Hz sampling rate
+- 6 physiological signals: ECG, EDA, EMG, Respiration, Temperature, ACC
+- Labels: 1=calm, 2=stress, 3=amusement → remapped to 0/1/2
+- ~500 windows × 60 seconds after windowing
+
+---
+
+## The 6 signals
+
+| Signal | Measures | Sensor platform | Cost tier |
+|--------|----------|----------------|-----------|
+| **ECG (HRV)** | Heart rate variability — gaps between beats | Shimmer3R ECG | Medium |
+| **EDA** | Sweat gland activity — sympathetic arousal | Empatica E4 / EmbracePlus | High |
+| **ACC** | Physical movement and restlessness | MEMS chip (any wristband) | Very low |
+| **Respiration** | Breathing rate and depth | Shimmer3 chest belt | Medium |
+| **Temperature** | Skin surface temperature | NTC thermistor | Very low |
+| **EMG** | Muscle tension — trapezius and zygomaticus | Shimmer3R EMG / Bitalino | Very high |
+
+---
+
+## Research hypotheses
+
+Six hypotheses were tested. Results after full experiment:
+
+| # | Hypothesis | Result |
+|---|-----------|--------|
+| H1 | Multimodal outperforms unimodal | ✅ **Confirmed** |
+| H2 | All 6 signals produce the highest accuracy | ❌ **Rejected** — 3-signal wins |
+| H3 | EDA is the strongest single signal | ✅ **Confirmed** — P=0.735 |
+| H4 | Optimal combination shifts with deployment context | ✅ **Confirmed** — winner changes 3× |
+| H5 | HRV is a strong stress indicator | ❌ **Rejected** — weakest signal (P=0.304) |
+| H6 | A 2-sensor wristband can compete with full lab setup | ✅ **Confirmed** — EDA+ACC is 0.002 behind best 3-signal |
+
+---
+
+## Project structure
 
 ```
-Raw WESAD Data (700Hz, per subject .pkl files)
-        │
-        ▼
- Load & Synchronize 6 signals + labels per timestamp
-        │
-        ▼
- Segment into 60-second windows
- (700 samples/sec × 60 sec = 42,000 samples/window)
-        │
-        ▼
- Feature Extraction per window
- (HRV features, EDA decomposition, ACC stats, etc.)
-        │
-        ▼
- Final Feature Matrix (~500 rows × 13 features + label)
-        │
-        ▼
- Train 4 ML Models × 20 Signal Combinations = 80 experiments
- (Subject-wise cross-validation — person-independent)
-        │
-        ▼
- Evaluate: F1_macro, Recall_stress, MCC
-        │
-        ▼
- MCDA Framework: Score each combo on Performance + Cost
-        │
-        ▼
- Sensitivity Analysis across λ ∈ {0.2, 0.4, 0.5, 0.6, 0.8, 1.0}
-        │
-        ▼
- Streamlit Dashboard — Interactive results explorer
-```
-
-### Feature Engineering Details
-
-```python
-# Each 60-second window produces these features:
-features = {
-    # HRV (from raw ECG)
-    'SDNN': std_dev_of_rr_intervals,        # Low = stressed
-    'RMSSD': beat_to_beat_fluctuation,      # Low = stressed
-
-    # EDA (electrodermal)
-    'SCL_mean': baseline_skin_conductance,
-    'SCR_n': count_of_stress_spikes,
-    'EDA_std': variation_in_sweat_signal,
-
-    # Accelerometer
-    'ACC_std': movement_variation,           # High = restless
-    'ACC_entropy': movement_randomness,
-
-    # Respiration
-    'Resp_mean': avg_breathing_signal,
-    'Resp_std': breathing_variation,
-
-    # Temperature
-    'Temp_mean': avg_skin_temp,             # Drops under stress
-
-    # EMG
-    'EMG_RMS': muscle_activation_level,
-
-    'Label': {1: 'calm', 2: 'stress', 3: 'amusement'},
-    'Subject': 'S2'  # Subject ID for cross-validation
-}
-```
-
-### ML Models Used
-
-| Model | Type | Rationale |
-|-------|------|-----------|
-| Logistic Regression | Linear | Interpretable baseline |
-| Random Forest | Ensemble Tree | Handles non-linearity, robust to overfitting |
-| XGBoost | Gradient Boosting | Best performance on tabular data |
-| SVM (RBF kernel) | Margin-based | Excellent for imbalanced, high-dim data |
-
-All models use `class_weight='balanced'` and **subject-wise cross-validation** (train on S2–S14, test on S15 etc.) to ensure person-independent generalization.
-
----
-
-## 📊 Results
-
-### Tier Summary
-
-| Tier | Best Combination | Best Model | Performance Score |
-|------|-----------------|------------|-------------------|
-| Unimodal | **EDA** | SVM | 0.7346 |
-| 2-signal | **EDA + ACC** | SVM | 0.7418 |
-| 3-signal | **EDA + ACC + EMG** | XGBoost | 0.7440 |
-| All 6 signals | — | RandomForest | 0.7150 ⚠️ |
-
-> ⚠️ **All 6 signals (P=0.715) is outperformed by EDA+ACC+EMG (P=0.744).** More sensors ≠ better performance.
-
-
-
-## 🎯 MCDA Framework
-
-### Evaluation Metrics
-
-```
-Performance Score:
-P = 0.40 × F1_macro + 0.35 × Recall_stress + 0.25 × MCC_norm
-
-Cost Score (per signal, 1–5 scale):
-C = 0.25×H + 0.25×W + 0.25×B + 0.25×(6−R)
-    H = hardware cost | W = wearability | B = battery | R = robustness
-
-Optimized Score:
-O = λ × P + (1−λ) × (1 − Cost_norm)
-```
-
-### Sensitivity Analysis — λ Sweep
-
-**The winner shifts 3 times: ACC → EDA+ACC → EDA+ACC+EMG**
-
----
-
-## 🏆 Key Findings
-
-1. **EDA is the best single sensor** — P=0.735, Recall_stress=0.839. Sweat gland activity is the most reliable physiological stress indicator.
-
-2. **ACC is a surprisingly strong signal** — P=0.674 as a standalone. Behavioral patterns (restlessness, fidgeting) are powerful stress markers, consistent with Shukla et al. (2025).
-
-3. **HRV underperforms despite being the most cited stress biomarker** — P=0.304. Motion artifacts at 700Hz sampling severely degrade HRV quality in real-world conditions.
-
-4. **EDA+ACC is the sweet spot** — Best balance of performance (P=0.742) and cost (0.37). Both sensors are wristband-compatible and non-invasive.
-
-5. **More sensors ≠ better performance** — All 6 signals (P=0.715) is WORSE than the 3-signal winner EDA+ACC+EMG (P=0.744). HRV and Respiration introduce noise that hurts the model.
-
-6. **The optimal sensor set is deployment-dependent** — The MCDA winner changes 3 times across the λ sweep. This is the central contribution of this work.
-
----
-
-## 📱 Deployment Recommendations
-
-| Context | Best Combo | Optimized Score | Reasoning |
-|---------|-----------|-----------------|-----------|
-| **Consumer wearable app** (λ=0.2) | ACC alone | O=0.855 | Cheapest, most comfortable, already in every smartwatch |
-| **Balanced real-world** (λ=0.5) | EDA+ACC | O=0.674 | Best performance-cost balance, both wristband-compatible |
-| **Clinical/lab** (λ=1.0) | EDA+ACC+EMG | O=0.744 | Max stress recall, but requires gel electrodes on shoulder+face |
-
-
-## 📁 Project Structure
-
-```
+stress-classifier/
 ├── data/
-│   └── WESAD/                  # Raw dataset (S2–S17 subject folders)
-├── notebooks/
-│   ├── 01_feature_extraction.ipynb
-│   ├── 02_unimodal_models.ipynb
-│   ├── 03_multimodal_combinations.ipynb
-│   └── 04_mcda_analysis.ipynb
+│   └── wesad/
+│       └── S2, S3, S4 ... S17/      ← WESAD raw .pkl files
 ├── src/
-│   ├── feature_engineering.py
-│   ├── models.py
-│   └── mcda.py
-├── streamlit_app/
-│   └── app.py                  # Interactive dashboard
-├── results/
-│   └── experiment_results_summary.html
-├── README.md
-└── requirements.txt
+│   ├── load_data.py                  ← Load .pkl, extract chest signals + labels
+│   ├── windowing.py                  ← Segment into 60s windows at 700Hz
+│   ├── build_dataset.py             ← Orchestrate windowing → feature extraction
+│   ├── features.py                   ← Feature extraction per signal per window
+│   └── ml/
+│       ├── train_unimodal.py         ← Train 4 models × 6 signals
+│       └── train_multimodal.py       ← Train 4 models × 13 combinations
+├── main.py                           ← Run full pipeline → final_dataset.csv
+├── compute_cost.py                   ← MCDA cost calculation for all 20 combos
+├── app.py                  ← Interactive results dashboard
+├── final_dataset.csv                 ← Feature matrix (500 rows × 13 cols)
+├── unimodal_results.csv             ← Results for 6 unimodal signals
+├── multimodal_results.csv           ← Results for 13 multimodal combos
+└── cost_scores.csv                  ← MCDA cost scores for all 20 combos
 ```
 
 ---
 
-**Requirements:** Python 3.9+, scikit-learn, xgboost, neurokit2, pandas, numpy, matplotlib, streamlit
+## Pipeline
 
+```
+Raw WESAD .pkl
+      │
+      ▼
+load_data.py      → Extract 6 signals + labels per subject
+      │
+      ▼
+windowing.py      → 60s windows (42,000 samples each at 700Hz)
+      │
+      ▼
+features.py       → 11 features: SDNN, RMSSD, SCL_mean, SCR_N, EDA_std,
+      │               ACC_std, ACC_entropy, Resp_mean, Resp_std, Temp_mean, EMG_RMS
+      ▼
+final_dataset.csv → ~500 rows × 13 cols (features + Label + Subject)
+      │
+      ├──► train_unimodal.py    → unimodal_results.csv
+      └──► train_multimodal.py  → multimodal_results.csv
+                │
+                ▼
+          compute_cost.py       → cost_scores.csv
+                │
+                ▼
+          Excel / Python        → Performance score P, Optimised score O per λ
+                │
+                ▼
+          streamlit_app.py      → Interactive dashboard
+```
 
 ---
 
-*Built with the WESAD dataset. Inspired by Prof. Shukla's work on affective computing and passive digital biomarkers.*
+## Features extracted
+
+| Feature | Signal | What it captures |
+|---------|--------|-----------------|
+| SDNN | HRV | Standard deviation of heartbeat intervals — lower = more stressed |
+| RMSSD | HRV | Short-term beat-to-beat variation — lower = more stressed |
+| SCL_mean | EDA | Baseline skin conductance level |
+| SCR_N | EDA | Number of stress spikes in the window |
+| EDA_std | EDA | Variability in skin conductance |
+| ACC_std | ACC | Movement variability — fidgeting |
+| ACC_entropy | ACC | Randomness of movement pattern |
+| Resp_mean | Respiration | Average breathing signal amplitude |
+| Resp_std | Respiration | Breathing variability |
+| Temp_mean | Temperature | Average skin temperature |
+| EMG_RMS | EMG | Muscle activation level |
+
+---
+
+## ML models
+
+| Model | Type | Why included |
+|-------|------|-------------|
+| Logistic Regression | Linear | Interpretable baseline |
+| Random Forest | Tree ensemble | Non-linear, handles feature interactions |
+| SVM | Margin-based | Strong for small datasets with high-dim features |
+| XGBoost | Gradient boosting | Best performance on tabular data generally |
+
+All models use `class_weight="balanced"` to handle class imbalance.  
+Train/test split: `GroupShuffleSplit(test_size=0.2)` — no subject in both train and test.
+
+---
+
+## Evaluation metrics
+
+**Headline metrics (used in model selection):**
+
+```
+Performance P = 0.40 · F1_macro  +  0.35 · Recall_stress  +  0.25 · MCC_norm
+
+where MCC_norm = (MCC + 1) / 2    →  range [0, 1]
+```
+
+**Supplementary (reported in full results table):** Specificity, AUC-ROC (OvR), Cohen's Kappa
+
+**Why Recall_stress gets the highest weight:** In clinical mental health applications, missing a real stress episode (false negative) is worse than a false alarm. This asymmetric weighting reflects the Fβ framework with β>1.
+
+---
+
+## MCDA cost scoring
+
+Each signal scored on 4 dimensions sourced from published device datasheets:
+
+```
+Cᵢ = 0.25·H + 0.25·W + 0.25·B + 0.25·(6−R)
+
+where:
+  H = Hardware cost    (1=cheap, 5=expensive)
+  W = Wearability      (1=comfortable, 5=intrusive)
+  B = Battery drain    (1=low, 5=high)
+  R = Robustness       (1=fragile, 5=robust) — inverted via (6−R)
+
+For combinations: C_combo = (1/n) Σ Cᵢ   [arithmetic mean]
+Normalised:       C_norm  = (C − min) / (max − min)  →  [0.1, 1.0]
+```
+
+**Sources:** iMotions (2025), Shimmer Research datasheets, Empatica E4 specs,  
+Bitalino EMG specs, MDPI motion artifact review (2020), npj Cardiovascular Health (2025)
+
+---
+
+## Optimised score
+
+```
+O = λ · P  +  (1 − λ) · (1 − C_norm)
+
+λ = 0.2  →  Consumer app (prioritise cheapness and comfort)
+λ = 0.5  →  Balanced deployment
+λ = 1.0  →  Lab / clinical (ignore cost, maximise performance)
+```
+
+Sensitivity analysis run at λ ∈ {0.2, 0.4, 0.6, 0.8, 1.0}.
+
+---
+
+## Future work
+
+- **Phase 2 — Anxiety/depression classification:** Apply pipeline to K-EmoCon, DREAMER, or MAHNOB-HCI datasets with valence-arousal labels. Map EDA+ACC signal pair to the Russell circumplex model.
+
+- **Phase 3 — Personality-modulated classification:** Integrate Big Five (OCEAN) personality scores as features. Neuroticism modulates EDA reactivity; Conscientiousness modulates HRV regulation. ASCERTAIN dataset supports this directly.
+
+- **Phase 4 — Clinical disorder classification:** Extend sensor selection framework to anxiety disorders, OCD, BPD, PTSD. The MCDA approach generalises to any condition where sensor cost tradeoffs matter.
+
+---
+
+## Citations
+
+1. Chicco & Jurman (2020). MCC advantages over F1 and accuracy. *BMC Genomics*, 21(1), 6.
+2. Chicco, Tötsch & Jurman (2021). MCC reliability. *BioData Mining*, 14, 13.
+3. Ivlev et al. (2016). MCDA for MRI selection. *Int. J. Medical Engineering and Informatics*, 8(2).
+4. Ivlev et al. (2015). MCDA for medical devices under uncertainty. *EJOR*, 247(1).
+5. Marsh et al. (2016). MCDA emerging good practices. *Value in Health*, 19(2). PMC4828475.
+6. Shbool et al. (2021). MCDA framework for medical device selection. *Cogent Engineering*, 8(1).
+7. Luo et al. (2021). Performance metrics for ML models. *Radiology: AI*. PMC8204137.
+8. Ling, Huang & Zhang (2008). ROC curves and Cohen's kappa. *Engineering Applications of AI*.
+9. Yadav, Upadhyay & Shukla (2025). Multimodal biomarkers for ADHD. *TechRxiv*. DOI: 10.36227/techrxiv.176403977.
+10. Schmidt et al. (2018). Introducing WESAD. *ICMI 2018*.
